@@ -91,10 +91,11 @@ async function run() {
 
 
 
-        app.get('/bookings', async (req, res) => {
-            const booking = {}
-            const bookings = await bookingsCollection.find(booking).toArray()
-            res.send(bookings)
+        app.get('/booking/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) }
+            const booking = await bookingsCollection.findOne(query)
+            res.send(booking)
         })
 
         app.get('/booking', verifyJWT, async (req, res) => {
@@ -129,13 +130,20 @@ async function run() {
             res.send(result)
         })
 
+        app.delete('/booking/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) }
+            const result = await bookingsCollection.deleteOne(filter)
+            res.send(result)
+        })
+
 
         app.get('/jwt', async (req, res) => {
             const email = req.query.email;
             const query = { email: email }
             const user = await usersCollection.findOne(query);
             if (user) {
-                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: '1h' })
+                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN)
                 return res.send({ accessToken: token })
             }
 
@@ -175,6 +183,25 @@ async function run() {
             const result = await usersCollection.updateOne(filter, updatedDoc, options)
             res.send(result)
         })
+
+        app.delete('/users/admin/:id', verifyJWT, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) }
+            const result = await usersCollection.deleteOne(filter)
+            res.send(result)
+        })
+        //Temporary to update a price field to the AppointmentOptionCollection
+        // app.get('/addprice', async (req, res) => {
+        //     const filter = {};
+        //     const options = { upsert: true }
+        //     const updatedDoc = {
+        //         $set: {
+        //             price: 99
+        //         }
+        //     }
+        //     const result = await appointmentOptionCollection.updateMany(filter, updatedDoc, options)
+        //     res.send(result)
+        // })
 
         app.get('/doctors', verifyJWT, verifyAdmin, async (req, res) => {
             const query = {};
