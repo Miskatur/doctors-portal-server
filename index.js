@@ -237,7 +237,7 @@ async function run() {
 
         app.get('/doctors', verifyJWT, verifyAdmin, async (req, res) => {
             const query = {};
-            const doctors = await paymentsCollection.find(query).toArray();
+            const doctors = await docotorsCollection.find(query).toArray();
             res.send(doctors)
 
         })
