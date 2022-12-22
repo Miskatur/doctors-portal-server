@@ -5,6 +5,9 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const stripe = require("stripe")(`${process.env.STRIPE_SECRET_KEY}`);
 const port = process.env.PORT || 5000;
+const nodemailer = require("nodemailer");
+const mg = require('nodemailer-mailgun-transport');
+
 
 const app = express();
 
@@ -16,6 +19,48 @@ app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.8r9nhhc.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
+
+function sendBookingEmail(booking) {
+
+    const { email, treatment, appointmentDate, slot } = booking;
+
+    // let transporter = nodemailer.createTransport({
+    //     host: 'smtp.sendgrid.net',
+    //     port: 587,
+    //     auth: {
+    //         user: "apikey",
+    //         pass: process.env.SENDGRID_API_KEY
+    //     }
+    // })
+    const auth = {
+        auth: {
+            api_key: process.env.EMAIL_API_KEY,
+            domain: process.env.EMAIL_SEND_DOMAIN
+        }
+    }
+
+    const transporter = nodemailer.createTransport(mg(auth));
+    console.log('sending Email : ', email);
+    transporter.sendMail({
+        from: "miskaturrahman34826@gmail.com", // verified sender email
+        to: email, // recipient email
+        subject: `You Appointment for ${treatment} is confirmed.`, // Subject line
+        text: "Hello world!", // plain text body
+        html: `
+        <h3>Your Appointment is Confirmed.</h3>
+        <p>Your Appointment for ${treatment} is confirmed.</p>
+        <p>Please visit us on ${appointmentDate} at ${slot} </p>
+        <p>Thanks from Doctor's Portal</p>
+        `, // html body
+    }, function (error, info) {
+        if (error) {
+            console.log(error);
+        } else {
+            console.log('Email sent: ' + info.response);
+        }
+    });
+
+}
 
 
 function verifyJWT(req, res, next) {
@@ -43,7 +88,6 @@ async function run() {
 
         //use VerifyJWT before verifyAdmin
         const verifyAdmin = async (req, res, next) => {
-            console.log(`inside verifyAdmin`, req.decoded.email)
             const decodedEmail = req.decoded.email;
             const AdminQuery = { email: decodedEmail }
             const user = await usersCollection.findOne(AdminQuery)
@@ -128,6 +172,8 @@ async function run() {
                 return res.send({ acknowledged: false, message })
             }
             const result = await bookingsCollection.insertOne(booking)
+            //send Email about appointment confirmation
+            sendBookingEmail(booking)
             res.send(result)
         })
 
@@ -183,7 +229,6 @@ async function run() {
         })
 
         app.get('/users', verifyJWT, verifyAdmin, async (req, res) => {
-
             const query = {};
             const users = await usersCollection.find(query).toArray()
             res.send(users)
@@ -199,6 +244,14 @@ async function run() {
         app.post('/users', async (req, res) => {
             const user = req.body;
             const result = await usersCollection.insertOne(user)
+            const email = user.email
+            const query = {
+                email: email
+            }
+            const userExist = await usersCollection.find(query).toArray()
+            if (userExist.length) {
+                return
+            }
             res.send(result)
         })
 
